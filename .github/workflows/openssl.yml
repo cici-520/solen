@@ -37,10 +37,10 @@ jobs:
             ./config no-shared no-dso no-tests --prefix=/opt/openssl
             make -j$(nproc)
             sudo make install
-            cd ..
+            cd .. 
           fi
 
-      # Step 4: Download and build PCRE (Static)
+      # Step 4: Build PCRE (Static)
       - name: Build PCRE
         run: |
           if [ ! -d "pcre-8.45" ]; then
@@ -53,7 +53,7 @@ jobs:
             cd ..
           fi
 
-      # Step 5: Download and build Zlib (Static)
+      # Step 5: Build Zlib (Static)
       - name: Build Zlib
         run: |
           if [ ! -d "zlib-1.2.11" ]; then
@@ -66,25 +66,24 @@ jobs:
             cd ..
           fi
 
-      # Step 6: Create Git tag
-      - name: Create Git tag
-        id: create_tag
+      # Step 6: Create a Git tag for release
+      - name: Create Git tag and push
         run: |
-          VERSION="v1.0.0"  # You can modify this version as needed
+          VERSION="v1.0.0"
           
-          # Set Git configuration
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          # Set up user details
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Set up authentication for pushing to the repository
-          git remote set-url origin https://github.com/${{ github.repository }}.git
+          # Create a tag
           git tag $VERSION
           
-          # Push the tag to GitHub
+          # Push the tag to the repository using the GITHUB_TOKEN
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} $VERSION
 
       # Step 7: Upload Static Libraries to GitHub Release
-      - name: Create GitHub Release and upload files
+      - name: Create Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           files: |
@@ -92,5 +91,3 @@ jobs:
             /opt/openssl/lib/libcrypto.a
             /opt/pcre/lib/libpcre.a
             /opt/zlib/lib/libz.a
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
