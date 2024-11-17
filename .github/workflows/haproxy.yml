@@ -1,0 +1,82 @@
+name: Cross-compile HAProxy for ARMv7 with Static Libraries
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      # Step 1: Checkout HAProxy source code
+      - name: Checkout HAProxy source code
+        uses: actions/checkout@v2
+
+      # Step 2: Install cross-compilation tools for ARMv7
+      - name: Install cross-compilation tools for ARMv7
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-arm-linux-gnueabihf \
+            binutils-arm-linux-gnueabihf \
+            make \
+            wget \
+            git \
+            build-essential \
+            curl \
+            libc6-dev-armhf-cross
+
+      # Step 3: Download OpenSSL, PCRE, and Zlib artifacts from previous workflow
+      - name: Download OpenSSL, PCRE, and Zlib artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: libraries  # The name of the artifact uploaded in the first workflow
+
+      # Step 4: Unzip the downloaded libraries
+      - name: Unzip OpenSSL, PCRE, and Zlib
+        run: |
+          unzip openssl.zip -d /opt
+          unzip pcre.zip -d /opt
+          unzip zlib.zip -d /opt
+
+      # Step 5: Set up environment for cross-compilation
+      - name: Set up environment for cross-compilation
+        run: |
+          export CROSS_COMPILE=arm-linux-gnueabihf-
+          export CC=${CROSS_COMPILE}gcc
+          export CXX=${CROSS_COMPILE}g++
+          export AR=${CROSS_COMPILE}ar
+          export RANLIB=${CROSS_COMPILE}ranlib
+          export LD=${CROSS_COMPILE}ld
+          export AS=${CROSS_COMPILE}as
+          export LDFLAGS="-L/opt/openssl/lib -L/opt/pcre/lib -L/opt/zlib/lib"
+          export CPPFLAGS="-I/opt/openssl/include -I/opt/pcre/include -I/opt/zlib/include"
+          export CFLAGS="-I/opt/openssl/include -I/opt/pcre/include -I/opt/zlib/include"
+          export CXXFLAGS="-I/opt/openssl/include -I/opt/pcre/include -I/opt/zlib/include"
+
+      # Step 6: Install dependencies for HAProxy (on ARMv7)
+      - name: Install dependencies for HAProxy
+        run: |
+          sudo apt-get install -y libssl-dev
+
+      # Step 7: Build HAProxy with static libraries for ARMv7
+      - name: Compile HAProxy for ARMv7 with static libraries
+        run: |
+          cd haproxy
+          make TARGET=linux-arm CC=${CC} USE_OPENSSL=1 USE_PCRE=1 USE_ZLIB=1 \
+            SSL_LIB=/opt/openssl/lib SSL_INC=/opt/openssl/include \
+            PCRE_LIB=/opt/pcre/lib PCRE_INC=/opt/pcre/include \
+            ZLIB_LIB=/opt/zlib/lib ZLIB_INC=/opt/zlib/include
+
+      # Step 8: Install HAProxy (optional)
+      - name: Install HAProxy
+        run: |
+          sudo make install
+
+      # Step 9: Upload the compiled HAProxy binary as an artifact for downloading
+      - name: Upload compiled HAProxy binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: haproxy-armv7-binary
+          path: haproxy/haproxy  # Path to the compiled binary, adjust as necessary
