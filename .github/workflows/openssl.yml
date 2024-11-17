@@ -40,7 +40,7 @@ jobs:
             cd .. 
           fi
 
-      # Step 4: Build PCRE (Static)
+      # Step 4: Download and build PCRE (Static)
       - name: Build PCRE
         run: |
           if [ ! -d "pcre-8.45" ]; then
@@ -50,10 +50,10 @@ jobs:
             ./configure --prefix=/opt/pcre --enable-static --disable-shared
             make -j$(nproc)
             sudo make install
-            cd ..
+            cd .. 
           fi
 
-      # Step 5: Build Zlib (Static)
+      # Step 5: Download and build Zlib (Static)
       - name: Build Zlib
         run: |
           if [ ! -d "zlib-1.2.11" ]; then
@@ -63,31 +63,5 @@ jobs:
             ./configure --prefix=/opt/zlib --static
             make -j$(nproc)
             sudo make install
-            cd ..
+            cd .. 
           fi
-
-      # Step 6: Create a Git tag for release
-      - name: Create Git tag and push
-        run: |
-          VERSION="v1.0.0"
-          
-          # Set up user details
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Create a tag
-          git tag $VERSION
-          
-          # Push the tag to the repository using the GITHUB_TOKEN
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} $VERSION
-
-      # Step 7: Upload Static Libraries to GitHub Release
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            /opt/openssl/lib/libssl.a
-            /opt/openssl/lib/libcrypto.a
-            /opt/pcre/lib/libpcre.a
-            /opt/zlib/lib/libz.a
