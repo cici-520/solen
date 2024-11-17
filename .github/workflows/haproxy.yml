@@ -39,12 +39,21 @@ jobs:
           # Download Zlib zip from GitHub Release
           wget -O zlib.zip https://github.com/cici-520/solen/releases/download/v1.2.11/zlib.zip
 
-      # Step 4: Unzip the downloaded libraries
+      # Step 4: Unzip the downloaded libraries and remove extra directories
       - name: Unzip OpenSSL, PCRE, and Zlib
         run: |
-          unzip openssl.zip -d /opt
-          unzip pcre.zip -d /opt
-          unzip zlib.zip -d /opt
+          # Unzip to a temporary directory and remove extra directories
+          unzip openssl.zip -d /tmp
+          unzip pcre.zip -d /tmp
+          unzip zlib.zip -d /tmp
+
+          # Move content from /tmp/opt/* to /opt and remove the extra layer of directories
+          mv /tmp/opt/openssl /opt
+          mv /tmp/opt/pcre /opt
+          mv /tmp/opt/zlib /opt
+
+          # Clean up the temporary directory
+          rm -rf /tmp/opt
 
       # Step 5: Set up environment for cross-compilation
       - name: Set up environment for cross-compilation
