@@ -11,7 +11,12 @@ jobs:
     steps:
       # Step 1: Checkout HAProxy source code
       - name: Checkout HAProxy source code
-        uses: actions/checkout@v2
+        run: |
+          # Clone the HAProxy repository (v2.5 branch as an example)
+          git clone https://github.com/haproxy/haproxy.git
+          cd haproxy
+          # Checkout a specific release or branch, e.g., v2.5
+          git checkout v2.5
 
       # Step 2: Install cross-compilation tools for ARMv7
       - name: Install cross-compilation tools for ARMv7
@@ -78,7 +83,9 @@ jobs:
       # Step 7: Build HAProxy with static libraries for ARMv7
       - name: Compile HAProxy for ARMv7 with static libraries
         run: |
+          # Ensure we are in the haproxy directory
           cd haproxy
+          
           make TARGET=linux-arm CC=${CC} USE_OPENSSL=1 USE_PCRE=1 USE_ZLIB=1 \
             SSL_LIB=/opt/openssl/lib SSL_INC=/opt/openssl/include \
             PCRE_LIB=/opt/pcre/lib PCRE_INC=/opt/pcre/include \
