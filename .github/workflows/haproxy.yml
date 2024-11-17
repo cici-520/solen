@@ -1,4 +1,4 @@
-name: Build Haproxy for ARMv7
+name: Build Haproxy for ARM
 
 on:
   push:
@@ -10,102 +10,72 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # 使用 Ubuntu 虚拟机作为构建环境
+    runs-on: ubuntu-latest
 
     steps:
-      # 检出代码
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      # 设置 Docker Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v1
 
-      # 设置交叉编译环境，并安装所需的依赖库
       - name: Set up cross-compilation environment
         run: |
           sudo apt-get update
-          sudo apt-get remove -y containerd containerd.io  # 删除不需要的依赖
           sudo apt-get install -y \
             gcc-arm-linux-gnueabihf \
             binutils-arm-linux-gnueabihf \
             make \
+            docker.io \
+            libssl-dev \
+            zlib1g-dev \
+            libpcre3-dev \
+            autoconf \
+            libtool \
             wget \
             git \
-            autoconf \
-            build-essential \
-            libtool \
-            docker.io \
-            g++ \
-            libc6-dev-armhf-cross \
-            zlib1g-dev \
-            libssl-dev \
-            libpcre3-dev
+            g++
 
-      # 安装并编译 OpenSSL, PCRE, Zlib 和 glibc（如果需要）
-      - name: Build OpenSSL, PCRE, Zlib and glibc
+      - name: Download OpenSSL
         run: |
-          # 下载并编译 glibc
-          wget http://ftp.gnu.org/gnu/libc/glibc-2.35.tar.gz
-          tar -xvzf glibc-2.35.tar.gz
-          cd glibc-2.35
-          mkdir build && cd build
-          ../configure --prefix=/opt/glibc --enable-static
-          make -j$(nproc)
-          sudo make install
-          cd ../..
+          wget https://www.openssl.org/source/openssl-1.1.1q.tar.gz
+          tar -xvzf openssl-1.1.1q.tar.gz
+          cd openssl-1.1.1q && ./config --prefix=/opt/openssl no-shared
+          make && make install
 
-          # 下载并编译 OpenSSL
-          wget https://www.openssl.org/source/openssl-1.1.1l.tar.gz
-          tar -xvzf openssl-1.1.1l.tar.gz
-          cd openssl-1.1.1l
-          ./config --prefix=/opt/openssl no-shared no-dso
-          make -j$(nproc)
-          sudo make install
-          cd ..
+      - name: Download Zlib
+        run: |
+          # 下载最新版本的 Zlib 从 GitHub Releases
+          ZLIB_VERSION=1.2.12
+          curl -LO https://github.com/madler/zlib/archive/refs/tags/${ZLIB_VERSION}.tar.gz
+          tar -xvzf ${ZLIB_VERSION}.tar.gz
+          cd zlib-${ZLIB_VERSION} && ./configure --static
+          make && make install
 
-          # 下载并编译 Zlib
-          wget https://zlib.net/zlib-1.2.11.tar.gz
-          tar -xvzf zlib-1.2.11.tar.gz
-          cd zlib-1.2.11
-          ./configure --prefix=/opt/zlib --static
-          make -j$(nproc)
-          sudo make install
-          cd ..
+      - name: Download PCRE
+        run: |
+          wget https://ftp.pcre.org/pub/pcre/pcre-8.44.tar.gz
+          tar -xvzf pcre-8.44.tar.gz
+          cd pcre-8.44 && ./configure --prefix=/opt/pcre --disable-shared
+          make && make install
 
-          # 下载并编译 PCRE
-          wget https://ftp.pcre.org/pub/pcre/pcre-8.45.tar.gz
-          tar -xvzf pcre-8.45.tar.gz
-          cd pcre-8.45
-          ./configure --prefix=/opt/pcre --disable-shared
-          make -j$(nproc)
-          sudo make install
-          cd ..
-
-      # 编译 Haproxy
       - name: Build Haproxy for ARMv7
         run: |
-          # 获取 Haproxy 代码
-          git clone https://github.com/haproxy/haproxy.git
-          cd haproxy
-          git checkout v2.5.0
+          wget https://www.haproxy.org/download/2.7/src/haproxy-2.7.0.tar.gz
+          tar -xvzf haproxy-2.7.0.tar.gz
+          cd haproxy-2.7.0
+          make TARGET=linux2628 ARCH=armv7l USE_PCRE=1 USE_ZLIB=1 USE_OPENSSL=1 STATIC=1
+          make install
 
-          # 编译 Haproxy，并指定交叉编译选项
-          make TARGET=linux-arm ARCH=armv7l CROSS_COMPILE=arm-linux-gnueabihf- USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1 USE_STATIC=1 \
-            PCRE_INC=/opt/pcre/include PCRE_LIB=/opt/pcre/lib OPENSSL_INC=/opt/openssl/include OPENSSL_LIB=/opt/openssl/lib \
-            ZLIB_INC=/opt/zlib/include ZLIB_LIB=/opt/zlib/lib LDFLAGS="-L/opt/openssl/lib -L/opt/pcre/lib -L/opt/zlib/lib"
-
-      # 上传构建的 Haproxy 二进制文件
       - name: Upload Haproxy binaries
         uses: actions/upload-artifact@v3
         with:
           name: haproxy-arm-binaries
-          path: ./haproxy/haproxy  # 假设编译后的二进制文件为 ./haproxy/haproxy
-
-      # 创建 Release，并上传二进制文件
+          path: ./haproxy-2.7.0/haproxy  # 假设编译后的二进制文件路径
+          
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ./haproxy/haproxy  # 上传并发布二进制文件到 GitHub Release
+          files: ./haproxy-2.7.0/haproxy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
