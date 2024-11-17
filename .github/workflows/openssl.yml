@@ -73,6 +73,8 @@ jobs:
           VERSION="v1.0.0"  # You can modify this version as needed
           git tag $VERSION
           git push origin $VERSION
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Step 7: Upload Static Libraries to GitHub Release
       - name: Create GitHub Release and upload files
@@ -85,4 +87,3 @@ jobs:
             /opt/zlib/lib/libz.a
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
