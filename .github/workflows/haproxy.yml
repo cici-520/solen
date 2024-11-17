@@ -1,4 +1,4 @@
-name: Build Haproxy for ARM
+name: Build Haproxy for ARM (Static Build)
 
 on:
   push:
@@ -29,36 +29,95 @@ jobs:
             gcc-arm-linux-gnueabihf \
             binutils-arm-linux-gnueabihf \
             make \
-            docker.io
+            wget \
+            git \
+            build-essential \
+            docker.io \
+            autoconf \
+            libtool \
+            pkg-config
 
-      # 步骤 4: 构建 Haproxy 的 ARMv7 二进制文件
-      - name: Build Haproxy for ARMv7
+      # 步骤 4: 编译并安装静态依赖库 (OpenSSL, PCRE, Zlib, glibc)
+      - name: Build OpenSSL (Static)
         run: |
-          docker build --platform linux/arm/v7 -t haproxy-arm .
+          # 编译 OpenSSL 静态库
+          cd /tmp
+          git clone https://github.com/openssl/openssl.git
+          cd openssl
+          ./config no-shared no-dso no-tests no-async --prefix=/tmp/openssl --openssldir=/tmp/openssl
+          make -j$(nproc)
+          make install
 
-      # 步骤 5: 上传编译生成的二进制文件（作为构建产物）
+      - name: Build Zlib (Static)
+        run: |
+          # 编译 Zlib 静态库
+          cd /tmp
+          wget http://www.zlib.net/zlib-1.2.11.tar.gz
+          tar -xvf zlib-1.2.11.tar.gz
+          cd zlib-1.2.11
+          ./configure --static --prefix=/tmp/zlib
+          make -j$(nproc)
+          make install
+
+      - name: Build PCRE (Static)
+        run: |
+          # 编译 PCRE 静态库
+          cd /tmp
+          wget https://ftp.pcre.org/pub/pcre/pcre-8.44.tar.gz
+          tar -xvf pcre-8.44.tar.gz
+          cd pcre-8.44
+          ./configure --enable-static --prefix=/tmp/pcre
+          make -j$(nproc)
+          make install
+
+      - name: Build glibc (Static)
+        run: |
+          # 编译 glibc 静态库
+          cd /tmp
+          wget http://ftp.gnu.org/gnu/libc/glibc-2.31.tar.gz
+          tar -xvf glibc-2.31.tar.gz
+          cd glibc-2.31
+          mkdir build
+          cd build
+          ../configure --prefix=/tmp/glibc --enable-static --disable-shared
+          make -j$(nproc)
+          make install
+
+      # 步骤 5: 构建 Haproxy ARMv7 静态二进制文件
+      - name: Build Haproxy for ARMv7 (Static)
+        run: |
+          cd /tmp
+          git clone https://github.com/haproxy/haproxy.git
+          cd haproxy
+          make TARGET=linux-arm ARCH=armv7l CROSS_COMPILE=arm-linux-gnueabihf- USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1 USE_STATIC=1 \
+            PCRE_INC=/tmp/pcre/include PCRE_LIB=/tmp/pcre/lib \
+            OPENSSL_INC=/tmp/openssl/include OPENSSL_LIB=/tmp/openssl/lib \
+            ZLIB_INC=/tmp/zlib/include ZLIB_LIB=/tmp/zlib/lib \
+            LDFLAGS="-L/tmp/openssl/lib -L/tmp/pcre/lib -L/tmp/zlib/lib -L/tmp/glibc/lib -static" \
+            CFLAGS="-I/tmp/openssl/include -I/tmp/pcre/include -I/tmp/zlib/include -I/tmp/glibc/include"
+          
+      # 步骤 6: 上传编译生成的二进制文件（作为构建产物）
       - name: Upload Haproxy binaries
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3  # 使用 v3 版本上传
         with:
           name: haproxy-arm-binaries  # 上传的 artifact 名称
-          path: ./haproxy  # 假设构建好的二进制文件存放在当前目录下
+          path: /tmp/haproxy/haproxy  # 假设构建好的二进制文件存放在 /tmp/haproxy 目录下
 
-      # 步骤 6: 创建 Release 并上传构建产物
+      # 步骤 7: 创建 Release 并上传构建产物
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ./haproxy  # 上传构建好的二进制文件
+          files: /tmp/haproxy/haproxy  # 上传构建好的二进制文件
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用 GitHub 提供的 token 来访问和发布 Release
           
-      # 步骤 7: 自动推送到 GitHub 主分支（如果有更改需要推送）
+      # 步骤 8: 自动推送到 GitHub 主分支（如果有更改需要推送）
       - name: Push changes to GitHub
         run: |
-          git config --global user.email "cici77520@hotmail.com"  # 设置 Git 配置的邮件地址
+          git config --global user.email "youremail@example.com"  # 设置 Git 配置的邮件地址
           git config --global user.name "Your Name"  # 设置 Git 配置的用户名
           git add .  # 添加所有更改
-          git commit -m "Update Haproxy ARMv7 build"  # 提交更改
+          git commit -m "Update Haproxy ARMv7 static build"  # 提交更改
           git push origin main  # 推送更改到 GitHub 主分支
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用 GitHub Token 进行推送
-
