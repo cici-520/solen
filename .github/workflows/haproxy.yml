@@ -1,85 +1,100 @@
-name: Build Haproxy for ARM
+name: Cross-Compile HAProxy for ARMv7l
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3  # Updated to v3
+    - name: Checkout source code
+      uses: actions/checkout@v2
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2  # Updated to v2
+    - name: Set up cross-compilation environment
+      run: |
+        # Update package lists and install required dependencies
+        sudo apt-get update
+        
+        # Install necessary build dependencies
+        sudo apt-get install -y \
+          gcc-arm-linux-gnueabihf \
+          binutils-arm-linux-gnueabihf \
+          make \
+          docker.io \
+          libssl-dev \
+          zlib1g-dev \
+          libpcre3-dev \
+          autoconf \
+          libtool \
+          wget \
+          git \
+          g++
 
-      - name: Set up cross-compilation environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc-arm-linux-gnueabihf \
-            binutils-arm-linux-gnueabihf \
-            make \
-            docker.io \
-            libssl-dev \
-            zlib1g-dev \
-            libpcre3-dev \
-            autoconf \
-            libtool \
-            wget \
-            git \
-            g++
-          
-          # Clean up unnecessary packages
-          sudo apt-get -y autoremove
-          sudo apt-get clean
+        # Remove any conflicting containerd package
+        sudo apt-get remove --purge containerd containerd.io
 
-      - name: Download OpenSSL
-        run: |
-          wget https://www.openssl.org/source/openssl-1.1.1q.tar.gz
-          tar -xvzf openssl-1.1.1q.tar.gz
-          cd openssl-1.1.1q && ./config --prefix=/opt/openssl no-shared
-          make && make install
+        # Fix any broken dependencies
+        sudo apt-get install --fix-broken
 
-      - name: Download Zlib
-        run: |
-          # Download latest version of Zlib from GitHub Releases
-          ZLIB_VERSION=1.2.12
-          curl -LO https://github.com/madler/zlib/archive/refs/tags/${ZLIB_VERSION}.tar.gz
-          tar -xvzf ${ZLIB_VERSION}.tar.gz
-          cd zlib-${ZLIB_VERSION} && ./configure --static
-          make && make install
+        # Clean up unnecessary packages
+        sudo apt-get -y autoremove
+        sudo apt-get clean
 
-      - name: Download PCRE
-        run: |
-          wget https://ftp.pcre.org/pub/pcre/pcre-8.44.tar.gz
-          tar -xvzf pcre-8.44.tar.gz
-          cd pcre-8.44 && ./configure --prefix=/opt/pcre --disable-shared
-          make && make install
+    - name: Download and extract OpenSSL
+      run: |
+        # Download OpenSSL
+        wget https://www.openssl.org/source/openssl-1.1.1l.tar.gz
+        tar -xzf openssl-1.1.1l.tar.gz
+        cd openssl-1.1.1l
+        ./config no-shared no-dso no-tests --prefix=/opt/openssl
+        make -j$(nproc)
+        sudo make install
+        cd ..
 
-      - name: Build Haproxy for ARMv7
-        run: |
-          wget https://www.haproxy.org/download/2.7/src/haproxy-2.7.0.tar.gz
-          tar -xvzf haproxy-2.7.0.tar.gz
-          cd haproxy-2.7.0
-          make TARGET=linux2628 ARCH=armv7l USE_PCRE=1 USE_ZLIB=1 USE_OPENSSL=1 STATIC=1
-          make install
+    - name: Download and extract PCRE
+      run: |
+        # Download PCRE
+        wget https://ftp.pcre.org/pub/pcre/pcre-8.45.tar.gz
+        tar -xzf pcre-8.45.tar.gz
+        cd pcre-8.45
+        ./configure --prefix=/opt/pcre --enable-static --disable-shared
+        make -j$(nproc)
+        sudo make install
+        cd ..
 
-      - name: Upload Haproxy binaries
-        uses: actions/upload-artifact@v3
-        with:
-          name: haproxy-arm-binaries
-          path: ./haproxy-2.7.0/haproxy  # Assuming the binary path
+    - name: Download and extract Zlib
+      run: |
+        # Download Zlib
+        wget https://github.com/madler/zlib/archive/refs/tags/v1.2.11.tar.gz
+        tar -xzf v1.2.11.tar.gz
+        cd zlib-1.2.11
+        ./configure --prefix=/opt/zlib --static
+        make -j$(nproc)
+        sudo make install
+        cd ..
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ./haproxy-2.7.0/haproxy
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Download and extract HAProxy
+      run: |
+        # Clone HAProxy repository
+        git clone https://github.com/haproxy/haproxy.git
+        cd haproxy
+        git checkout 2.5
+
+        # Configure HAProxy to use static libraries
+        make TARGET=linux-armv7 CC=arm-linux-gnueabihf-gcc \
+             ZLIB_LIB=/opt/zlib/lib ZLIB_INCLUDE=/opt/zlib/include \
+             PCRE_LIB=/opt/pcre/lib PCRE_INCLUDE=/opt/pcre/include \
+             OPENSSL_LIB=/opt/openssl/lib OPENSSL_INCLUDE=/opt/openssl/include \
+             USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1
+
+        # Compile HAProxy
+        make -j$(nproc)
+        sudo make install
+        cd ..
+
+    - name: Verify HAProxy build
+      run: |
+        # Check if the build was successful
+        haproxy -v
