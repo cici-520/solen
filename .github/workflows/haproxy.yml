@@ -35,6 +35,10 @@ jobs:
             wget \
             git \
             g++
+          
+          # 清理不必要的软件包
+          sudo apt-get -y autoremove
+          sudo apt-get clean
 
       - name: Download OpenSSL
         run: |
