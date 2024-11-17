@@ -66,9 +66,16 @@ jobs:
             cd ..
           fi
 
-      # Step 6: Upload Static Libraries to GitHub Release
-      - name: Create Release
-        id: create_release
+      # Step 6: Create Git tag to trigger release
+      - name: Create Git tag
+        id: create_tag
+        run: |
+          VERSION="v1.0.0"  # You can modify this version as needed
+          git tag $VERSION
+          git push origin $VERSION
+
+      # Step 7: Upload Static Libraries to GitHub Release
+      - name: Create GitHub Release and upload files
         uses: softprops/action-gh-release@v1
         with:
           files: |
@@ -76,12 +83,6 @@ jobs:
             /opt/openssl/lib/libcrypto.a
             /opt/pcre/lib/libpcre.a
             /opt/zlib/lib/libz.a
-          
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            /opt/openssl/lib/libssl.a
-            /opt/openssl/lib/libcrypto.a
-            /opt/pcre/lib/libpcre.a
-            /opt/zlib/lib/libz.a
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
