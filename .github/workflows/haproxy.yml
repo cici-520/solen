@@ -27,11 +27,17 @@ jobs:
             curl \
             libc6-dev-armhf-cross
 
-      # Step 3: Download OpenSSL, PCRE, and Zlib artifacts from previous workflow
-      - name: Download OpenSSL, PCRE, and Zlib artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: libraries  # The name of the artifact uploaded in the first workflow
+      # Step 3: Download OpenSSL, PCRE, and Zlib from GitHub Releases
+      - name: Download OpenSSL, PCRE, and Zlib from GitHub Releases
+        run: |
+          # Download OpenSSL zip from GitHub Release
+          wget -O openssl.zip https://github.com/cici-520/solen/releases/download/v1.1.1l/openssl.zip
+          
+          # Download PCRE zip from GitHub Release
+          wget -O pcre.zip https://github.com/cici-520/solen/releases/download/v8.45/pcre.zip
+          
+          # Download Zlib zip from GitHub Release
+          wget -O zlib.zip https://github.com/cici-520/solen/releases/download/v1.2.11/zlib.zip
 
       # Step 4: Unzip the downloaded libraries
       - name: Unzip OpenSSL, PCRE, and Zlib
