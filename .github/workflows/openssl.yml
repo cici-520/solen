@@ -66,11 +66,17 @@ jobs:
             cd ..
           fi
 
-      # Step 6: Create Git tag to trigger release
+      # Step 6: Create Git tag
       - name: Create Git tag
         id: create_tag
         run: |
           VERSION="v1.0.0"  # You can modify this version as needed
+          
+          # Set Git configuration
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          
+          # Create and push tag
           git tag $VERSION
           git push origin $VERSION
         env:
