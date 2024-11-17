@@ -1,27 +1,27 @@
-name: Build Haproxy for ARM (Static Build)
+name: Build Haproxy for ARMv7
 
 on:
   push:
     branches:
-      - main  # 在主分支推送时触发
+      - main
   pull_request:
     branches:
-      - main  # 对主分支的 PR 进行触发
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest  # 使用 Ubuntu 虚拟机作为构建环境
 
     steps:
-      # 步骤 1: Checkout 仓库代码
+      # 检出代码
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      # 步骤 2: 设置 Docker Buildx，支持跨平台构建
+      # 设置 Docker Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
-      # 步骤 3: 设置交叉编译环境
+      # 设置交叉编译环境，并安装所需的依赖库
       - name: Set up cross-compilation environment
         run: |
           sudo apt-get update
@@ -31,93 +31,80 @@ jobs:
             make \
             wget \
             git \
-            build-essential \
-            docker.io \
             autoconf \
+            build-essential \
             libtool \
-            pkg-config
+            docker.io \
+            g++ \
+            libc6-dev-armhf-cross \
+            zlib1g-dev \
+            libssl-dev \
+            libpcre3-dev
 
-      # 步骤 4: 编译并安装静态依赖库 (OpenSSL, PCRE, Zlib, glibc)
-      - name: Build OpenSSL (Static)
+      # 安装并编译 OpenSSL, PCRE, Zlib 和 glibc（如果需要）
+      - name: Build OpenSSL, PCRE, Zlib and glibc
         run: |
-          # 编译 OpenSSL 静态库
-          cd /tmp
-          git clone https://github.com/openssl/openssl.git
-          cd openssl
-          ./config no-shared no-dso no-tests no-async --prefix=/tmp/openssl --openssldir=/tmp/openssl
+          # 下载并编译 glibc
+          wget http://ftp.gnu.org/gnu/libc/glibc-2.35.tar.gz
+          tar -xvzf glibc-2.35.tar.gz
+          cd glibc-2.35
+          mkdir build && cd build
+          ../configure --prefix=/opt/glibc --enable-static
           make -j$(nproc)
-          make install
+          sudo make install
+          cd ../..
 
-      - name: Build Zlib (Static)
-        run: |
-          # 编译 Zlib 静态库
-          cd /tmp
-          wget http://www.zlib.net/zlib-1.2.11.tar.gz
-          tar -xvf zlib-1.2.11.tar.gz
+          # 下载并编译 OpenSSL
+          wget https://www.openssl.org/source/openssl-1.1.1l.tar.gz
+          tar -xvzf openssl-1.1.1l.tar.gz
+          cd openssl-1.1.1l
+          ./config --prefix=/opt/openssl no-shared no-dso
+          make -j$(nproc)
+          sudo make install
+          cd ..
+
+          # 下载并编译 Zlib
+          wget https://zlib.net/zlib-1.2.11.tar.gz
+          tar -xvzf zlib-1.2.11.tar.gz
           cd zlib-1.2.11
-          ./configure --static --prefix=/tmp/zlib
+          ./configure --prefix=/opt/zlib --static
           make -j$(nproc)
-          make install
+          sudo make install
+          cd ..
 
-      - name: Build PCRE (Static)
-        run: |
-          # 编译 PCRE 静态库
-          cd /tmp
-          wget https://ftp.pcre.org/pub/pcre/pcre-8.44.tar.gz
-          tar -xvf pcre-8.44.tar.gz
-          cd pcre-8.44
-          ./configure --enable-static --prefix=/tmp/pcre
+          # 下载并编译 PCRE
+          wget https://ftp.pcre.org/pub/pcre/pcre-8.45.tar.gz
+          tar -xvzf pcre-8.45.tar.gz
+          cd pcre-8.45
+          ./configure --prefix=/opt/pcre --disable-shared
           make -j$(nproc)
-          make install
+          sudo make install
+          cd ..
 
-      - name: Build glibc (Static)
+      # 编译 Haproxy
+      - name: Build Haproxy for ARMv7
         run: |
-          # 编译 glibc 静态库
-          cd /tmp
-          wget http://ftp.gnu.org/gnu/libc/glibc-2.31.tar.gz
-          tar -xvf glibc-2.31.tar.gz
-          cd glibc-2.31
-          mkdir build
-          cd build
-          ../configure --prefix=/tmp/glibc --enable-static --disable-shared
-          make -j$(nproc)
-          make install
-
-      # 步骤 5: 构建 Haproxy ARMv7 静态二进制文件
-      - name: Build Haproxy for ARMv7 (Static)
-        run: |
-          cd /tmp
+          # 获取 Haproxy 代码
           git clone https://github.com/haproxy/haproxy.git
           cd haproxy
-          make TARGET=linux-arm ARCH=armv7l CROSS_COMPILE=arm-linux-gnueabihf- USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1 USE_STATIC=1 \
-            PCRE_INC=/tmp/pcre/include PCRE_LIB=/tmp/pcre/lib \
-            OPENSSL_INC=/tmp/openssl/include OPENSSL_LIB=/tmp/openssl/lib \
-            ZLIB_INC=/tmp/zlib/include ZLIB_LIB=/tmp/zlib/lib \
-            LDFLAGS="-L/tmp/openssl/lib -L/tmp/pcre/lib -L/tmp/zlib/lib -L/tmp/glibc/lib -static" \
-            CFLAGS="-I/tmp/openssl/include -I/tmp/pcre/include -I/tmp/zlib/include -I/tmp/glibc/include"
-          
-      # 步骤 6: 上传编译生成的二进制文件（作为构建产物）
-      - name: Upload Haproxy binaries
-        uses: actions/upload-artifact@v3  # 使用 v3 版本上传
-        with:
-          name: haproxy-arm-binaries  # 上传的 artifact 名称
-          path: /tmp/haproxy/haproxy  # 假设构建好的二进制文件存放在 /tmp/haproxy 目录下
+          git checkout v2.5.0
 
-      # 步骤 7: 创建 Release 并上传构建产物
+          # 编译 Haproxy，并指定交叉编译选项
+          make TARGET=linux-arm ARCH=armv7l CROSS_COMPILE=arm-linux-gnueabihf- USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1 USE_STATIC=1 \
+            PCRE_INC=/opt/pcre/include PCRE_LIB=/opt/pcre/lib OPENSSL_INC=/opt/openssl/include OPENSSL_LIB=/opt/openssl/lib \
+            ZLIB_INC=/opt/zlib/include ZLIB_LIB=/opt/zlib/lib LDFLAGS="-L/opt/openssl/lib -L/opt/pcre/lib -L/opt/zlib/lib"
+
+      # 上传构建的 Haproxy 二进制文件
+      - name: Upload Haproxy binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: haproxy-arm-binaries
+          path: ./haproxy/haproxy  # 假设编译后的二进制文件为 ./haproxy/haproxy
+
+      # 创建 Release，并上传二进制文件
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: /tmp/haproxy/haproxy  # 上传构建好的二进制文件
+          files: ./haproxy/haproxy  # 上传并发布二进制文件到 GitHub Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用 GitHub 提供的 token 来访问和发布 Release
-          
-      # 步骤 8: 自动推送到 GitHub 主分支（如果有更改需要推送）
-      - name: Push changes to GitHub
-        run: |
-          git config --global user.email "youremail@example.com"  # 设置 Git 配置的邮件地址
-          git config --global user.name "Your Name"  # 设置 Git 配置的用户名
-          git add .  # 添加所有更改
-          git commit -m "Update Haproxy ARMv7 static build"  # 提交更改
-          git push origin main  # 推送更改到 GitHub 主分支
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用 GitHub Token 进行推送
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
