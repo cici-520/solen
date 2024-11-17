@@ -16,8 +16,8 @@ jobs:
       run: |
         # Update package lists and install required dependencies
         sudo apt-get update
-        
-        # Install necessary build dependencies
+
+        # Install cross-compilation tools and other necessary build dependencies
         sudo apt-get install -y \
           gcc-arm-linux-gnueabihf \
           binutils-arm-linux-gnueabihf \
@@ -31,14 +31,12 @@ jobs:
           wget \
           git \
           g++ \
-          build-essential
+          build-essential \
+          curl
 
-        # Remove conflicting packages (containerd and containerd.io)
-        sudo apt-get remove --purge containerd containerd.io
-
-        # Fix broken dependencies if any
+        # Remove any potentially conflicting packages (e.g., containerd)
+        sudo apt-get remove --purge -y containerd containerd.io
         sudo apt-get install --fix-broken
-        sudo apt-get clean
 
     - name: Download and build OpenSSL (Static)
       run: |
@@ -78,7 +76,10 @@ jobs:
         # Clone the HAProxy repository
         git clone https://github.com/haproxy/haproxy.git
         cd haproxy
-        git checkout 2.5
+        git checkout 2.5  # Select stable version
+        
+        # Clean up previous builds if any
+        make clean
 
         # Configure HAProxy to use static libraries
         make TARGET=linux-armv7 CC=arm-linux-gnueabihf-gcc \
