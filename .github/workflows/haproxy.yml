@@ -9,14 +9,16 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      # Step 1: Checkout HAProxy source code
-      - name: Checkout HAProxy source code
+      # Step 1: Download HAProxy source code (v2.5.1 release as an example)
+      - name: Download HAProxy source code
         run: |
-          # Clone the HAProxy repository (v2.5 branch as an example)
-          git clone https://github.com/haproxy/haproxy.git
+          # Download the HAProxy source tarball
+          wget https://www.haproxy.org/download/2.5/src/haproxy-2.5.1.tar.gz
+          # Extract the source code
+          tar -xzf haproxy-2.5.1.tar.gz
+          # Change to the source directory
+          mv haproxy-2.5.1 haproxy
           cd haproxy
-          # Checkout a specific release or branch, e.g., v2.5
-          git checkout v2.5
 
       # Step 2: Install cross-compilation tools for ARMv7
       - name: Install cross-compilation tools for ARMv7
