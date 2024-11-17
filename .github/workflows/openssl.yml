@@ -76,11 +76,12 @@ jobs:
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
           
-          # Create and push tag
+          # Set up authentication for pushing to the repository
+          git remote set-url origin https://github.com/${{ github.repository }}.git
           git tag $VERSION
-          git push origin $VERSION
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Push the tag to GitHub
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} $VERSION
 
       # Step 7: Upload Static Libraries to GitHub Release
       - name: Create GitHub Release and upload files
