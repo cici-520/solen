@@ -62,6 +62,11 @@ jobs:
           # Clean up the temporary directory
           rm -rf /tmp/opt
 
+          # Verify the contents of the directories to check correct extraction
+          ls /opt/openssl
+          ls /opt/pcre
+          ls /opt/zlib
+
       # Step 5: Set up environment for cross-compilation
       - name: Set up environment for cross-compilation
         run: |
@@ -72,10 +77,19 @@ jobs:
           export RANLIB=${CROSS_COMPILE}ranlib
           export LD=${CROSS_COMPILE}ld
           export AS=${CROSS_COMPILE}as
+          
+          # Update flags to include the correct OpenSSL paths
           export LDFLAGS="-L/opt/openssl/lib -L/opt/pcre/lib -L/opt/zlib/lib"
-          export CPPFLAGS="-I/opt/openssl/include -I/opt/pcre/include -I/opt/zlib/include"
-          export CFLAGS="-I/opt/openssl/include -I/opt/pcre/include -I/opt/zlib/include"
-          export CXXFLAGS="-I/opt/openssl/include -I/opt/pcre/include -I/opt/zlib/include"
+          export CPPFLAGS="-I/opt/openssl/include/openssl -I/opt/pcre/include -I/opt/zlib/include"
+          export CFLAGS="-I/opt/openssl/include/openssl -I/opt/pcre/include -I/opt/zlib/include"
+          export CXXFLAGS="-I/opt/openssl/include/openssl -I/opt/pcre/include -I/opt/zlib/include"
+
+          # Verify if the environment variables are set correctly
+          echo $CROSS_COMPILE
+          echo $CC
+          echo $CXX
+          echo $CPPFLAGS
+          echo $CFLAGS
 
       # Step 6: Install dependencies for HAProxy (on ARMv7)
       - name: Install dependencies for HAProxy
@@ -87,9 +101,13 @@ jobs:
         run: |
           # Ensure we are in the haproxy directory
           cd haproxy
+          make clean  # Clean any old builds
           
+          # Debugging: Verify make targets
+          make help
+
           make TARGET=linux-arm CC=${CC} USE_OPENSSL=1 USE_PCRE=1 USE_ZLIB=1 \
-            SSL_LIB=/opt/openssl/lib SSL_INC=/opt/openssl/include \
+            SSL_LIB=/opt/openssl/lib SSL_INC=/opt/openssl/include/openssl \
             PCRE_LIB=/opt/pcre/lib PCRE_INC=/opt/pcre/include \
             ZLIB_LIB=/opt/zlib/lib ZLIB_INC=/opt/zlib/include
 
