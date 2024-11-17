@@ -1,0 +1,64 @@
+name: Build Haproxy for ARM
+
+on:
+  push:
+    branches:
+      - main  # 在主分支推送时触发
+  pull_request:
+    branches:
+      - main  # 对主分支的 PR 进行触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # 使用 Ubuntu 虚拟机作为构建环境
+
+    steps:
+      # 步骤 1: Checkout 仓库代码
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # 步骤 2: 设置 Docker Buildx，支持跨平台构建
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      # 步骤 3: 设置交叉编译环境
+      - name: Set up cross-compilation environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-arm-linux-gnueabihf \
+            binutils-arm-linux-gnueabihf \
+            make \
+            docker.io
+
+      # 步骤 4: 构建 Haproxy 的 ARMv7 二进制文件
+      - name: Build Haproxy for ARMv7
+        run: |
+          docker build --platform linux/arm/v7 -t haproxy-arm .
+
+      # 步骤 5: 上传编译生成的二进制文件（作为构建产物）
+      - name: Upload Haproxy binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: haproxy-arm-binaries  # 上传的 artifact 名称
+          path: ./haproxy  # 假设构建好的二进制文件存放在当前目录下
+
+      # 步骤 6: 创建 Release 并上传构建产物
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./haproxy  # 上传构建好的二进制文件
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用 GitHub 提供的 token 来访问和发布 Release
+          
+      # 步骤 7: 自动推送到 GitHub 主分支（如果有更改需要推送）
+      - name: Push changes to GitHub
+        run: |
+          git config --global user.email "cici77520@hotmail.com"  # 设置 Git 配置的邮件地址
+          git config --global user.name "Your Name"  # 设置 Git 配置的用户名
+          git add .  # 添加所有更改
+          git commit -m "Update Haproxy ARMv7 build"  # 提交更改
+          git push origin main  # 推送更改到 GitHub 主分支
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用 GitHub Token 进行推送
+
