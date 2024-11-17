@@ -133,9 +133,16 @@ jobs:
             wget http://ftp.gnu.org/gnu/libc/glibc-2.35.tar.gz
             tar -xzf glibc-2.35.tar.gz
             cd glibc-2.35
-            mkdir build
+
+            # Clean previous builds
+            make distclean || true
+
+            # Reconfigure the build system to avoid configuration issues
+            mkdir -p build
             cd build
-            ../configure --prefix=/opt/glibc --enable-static --disable-shared
+            ../configure --prefix=/opt/glibc --enable-static --disable-shared --host=arm-linux-gnueabihf --target=arm-linux-gnueabihf
+
+            # Proceed with build if configuration is successful
             make -j$(nproc)
             sudo make install
             cd ../..
@@ -143,6 +150,7 @@ jobs:
             echo "glibc already exists. Skipping..."
           fi
 
+        
       # Step 8: Clone the HAProxy repository and select correct version
       - name: Clone and configure HAProxy (ARMv7 Static)
         run: |
