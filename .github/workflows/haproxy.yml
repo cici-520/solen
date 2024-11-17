@@ -1,4 +1,4 @@
-name: Cross-Compile HAProxy for ARMv7l
+name: Cross-Compile HAProxy for ARMv7l (Static)
 
 on:
   push:
@@ -30,21 +30,19 @@ jobs:
           libtool \
           wget \
           git \
-          g++
+          g++ \
+          build-essential
 
-        # Remove any conflicting containerd package
+        # Remove conflicting packages (containerd and containerd.io)
         sudo apt-get remove --purge containerd containerd.io
 
-        # Fix any broken dependencies
+        # Fix broken dependencies if any
         sudo apt-get install --fix-broken
-
-        # Clean up unnecessary packages
-        sudo apt-get -y autoremove
         sudo apt-get clean
 
-    - name: Download and extract OpenSSL
+    - name: Download and build OpenSSL (Static)
       run: |
-        # Download OpenSSL
+        # Download and extract OpenSSL
         wget https://www.openssl.org/source/openssl-1.1.1l.tar.gz
         tar -xzf openssl-1.1.1l.tar.gz
         cd openssl-1.1.1l
@@ -53,9 +51,9 @@ jobs:
         sudo make install
         cd ..
 
-    - name: Download and extract PCRE
+    - name: Download and build PCRE (Static)
       run: |
-        # Download PCRE
+        # Download and extract PCRE
         wget https://ftp.pcre.org/pub/pcre/pcre-8.45.tar.gz
         tar -xzf pcre-8.45.tar.gz
         cd pcre-8.45
@@ -64,9 +62,9 @@ jobs:
         sudo make install
         cd ..
 
-    - name: Download and extract Zlib
+    - name: Download and build Zlib (Static)
       run: |
-        # Download Zlib
+        # Download and extract Zlib
         wget https://github.com/madler/zlib/archive/refs/tags/v1.2.11.tar.gz
         tar -xzf v1.2.11.tar.gz
         cd zlib-1.2.11
@@ -75,9 +73,9 @@ jobs:
         sudo make install
         cd ..
 
-    - name: Download and extract HAProxy
+    - name: Download and build HAProxy (ARMv7 Static)
       run: |
-        # Clone HAProxy repository
+        # Clone the HAProxy repository
         git clone https://github.com/haproxy/haproxy.git
         cd haproxy
         git checkout 2.5
@@ -87,7 +85,9 @@ jobs:
              ZLIB_LIB=/opt/zlib/lib ZLIB_INCLUDE=/opt/zlib/include \
              PCRE_LIB=/opt/pcre/lib PCRE_INCLUDE=/opt/pcre/include \
              OPENSSL_LIB=/opt/openssl/lib OPENSSL_INCLUDE=/opt/openssl/include \
-             USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1
+             USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1 \
+             LIBZ_STATIC=1 LIBSSL_STATIC=1 \
+             PCRE_STATIC=1
 
         # Compile HAProxy
         make -j$(nproc)
@@ -96,5 +96,5 @@ jobs:
 
     - name: Verify HAProxy build
       run: |
-        # Check if the build was successful
+        # Verify the static build of HAProxy
         haproxy -v
