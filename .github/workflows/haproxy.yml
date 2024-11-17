@@ -43,7 +43,7 @@ jobs:
           # Fix any broken dependencies
           sudo apt-get install --fix-broken
 
-      # Step 3: Cache dependencies for OpenSSL, PCRE, Zlib, and glibc
+      # Step 3: Cache dependencies for OpenSSL, PCRE, Zlib
       - name: Cache OpenSSL
         uses: actions/cache@v2
         with:
@@ -67,14 +67,6 @@ jobs:
           key: ${{ runner.os }}-zlib-${{ hashFiles('**/zlib-1.2.11.tar.gz') }}
           restore-keys: |
             ${{ runner.os }}-zlib-
-
-      - name: Cache glibc
-        uses: actions/cache@v2
-        with:
-          path: ~/.cache/glibc
-          key: ${{ runner.os }}-glibc-${{ hashFiles('**/glibc-2.35.tar.gz') }}
-          restore-keys: |
-            ${{ runner.os }}-glibc-
 
       # Step 4: Download and build OpenSSL (Static)
       - name: Download and build OpenSSL (Static)
@@ -125,33 +117,7 @@ jobs:
             echo "Zlib already exists. Skipping..."
           fi
 
-      # Step 7: Download and build glibc (Static)
-      - name: Download and build glibc (Static)
-        run: |
-          # Download and extract glibc
-          if [ ! -d "glibc-2.35" ]; then
-            wget http://ftp.gnu.org/gnu/libc/glibc-2.35.tar.gz
-            tar -xzf glibc-2.35.tar.gz
-            cd glibc-2.35
-
-            # Clean previous builds
-            make distclean || true
-
-            # Reconfigure the build system to avoid configuration issues
-            mkdir -p build
-            cd build
-            ../configure --prefix=/opt/glibc --enable-static --disable-shared --host=arm-linux-gnueabihf --target=arm-linux-gnueabihf
-
-            # Proceed with build if configuration is successful
-            make -j$(nproc)
-            sudo make install
-            cd ../..
-          else
-            echo "glibc already exists. Skipping..."
-          fi
-
-        
-      # Step 8: Clone the HAProxy repository and select correct version
+      # Step 7: Clone the HAProxy repository and select correct version
       - name: Clone and configure HAProxy (ARMv7 Static)
         run: |
           # Clone the HAProxy repository
@@ -169,17 +135,16 @@ jobs:
                ZLIB_LIB=/opt/zlib/lib ZLIB_INCLUDE=/opt/zlib/include \
                PCRE_LIB=/opt/pcre/lib PCRE_INCLUDE=/opt/pcre/include \
                OPENSSL_LIB=/opt/openssl/lib OPENSSL_INCLUDE=/opt/openssl/include \
-               GLIBC_LIB=/opt/glibc/lib GLIBC_INCLUDE=/opt/glibc/include \
-               USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1 USE_GLIBC=1 \
+               USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1 \
                LIBZ_STATIC=1 LIBSSL_STATIC=1 \
-               PCRE_STATIC=1 GLIBC_STATIC=1
+               PCRE_STATIC=1
 
           # Compile HAProxy
           make -j$(nproc)
           sudo make install
           cd ..
 
-      # Step 9: Verify HAProxy build
+      # Step 8: Verify HAProxy build
       - name: Verify HAProxy build
         run: |
           # Verify the static build of HAProxy
