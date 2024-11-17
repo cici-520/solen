@@ -65,3 +65,28 @@ jobs:
             sudo make install
             cd .. 
           fi
+
+      # Step 6: Package OpenSSL as a zip file
+      - name: Package OpenSSL as a zip file
+        run: |
+          zip -r openssl.zip /opt/openssl
+
+      # Step 7: Package PCRE as a zip file
+      - name: Package PCRE as a zip file
+        run: |
+          zip -r pcre.zip /opt/pcre
+
+      # Step 8: Package Zlib as a zip file
+      - name: Package Zlib as a zip file
+        run: |
+          zip -r zlib.zip /opt/zlib
+
+      # Step 9: Upload artifacts to GitHub
+      - name: Upload OpenSSL, PCRE, and Zlib as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: libraries
+          path: |
+            openssl.zip
+            pcre.zip
+            zlib.zip
