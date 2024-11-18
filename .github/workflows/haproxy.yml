@@ -78,7 +78,7 @@ jobs:
           export LD=${CROSS_COMPILE}ld
           export AS=${CROSS_COMPILE}as
           
-          # Update flags to include the correct OpenSSL paths
+          # Correct the flags for OpenSSL, make sure there are no extra 'I' issues
           export LDFLAGS="-L/opt/openssl/lib -L/opt/pcre/lib -L/opt/zlib/lib"
           export CPPFLAGS="-I/opt/openssl/include/openssl -I/opt/pcre/include -I/opt/zlib/include"
           export CFLAGS="-I/opt/openssl/include/openssl -I/opt/pcre/include -I/opt/zlib/include"
